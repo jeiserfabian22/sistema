@@ -55,10 +55,10 @@ def usuarios(request):
         # Admin sin sucursal seleccionada no ve nada
         usuarios_db = []
     
-    # Descifrar correos para mostrarlos en la vista
+    # Descifrar nombres de usuario para mostrarlos en la vista
     usuarios = []
     for usuario in usuarios_db:
-        usuario.correo_descifrado = EncryptionManager.decrypt_email(usuario.correo)
+        usuario.correo_descifrado = EncryptionManager.decrypt_data(usuario.correo)
         usuarios.append(usuario)
     
     tipoUsuarios = Tipousuario.objects.filter(estado=1)
@@ -106,10 +106,10 @@ def agregar(request):
                     "error": "La sucursal seleccionada no existe."
                 }, status=400)
 
-            # Cifrar el correo electrónico
-            correo_cifrado = EncryptionManager.encrypt_email(correoUsuario)
+            # Cifrar el nombre de usuario
+            correo_cifrado = EncryptionManager.encrypt_data(correoUsuario)
             if not correo_cifrado:
-                return JsonResponse({"error": "Error al cifrar el correo electrónico"}, status=400)
+                return JsonResponse({"error": "Error al cifrar el nombre de usuario"}, status=400)
             
             # Hashear la contraseña
             contrasena_hasheada = PasswordManager.hash_password(contrasenaUsuario)
@@ -185,15 +185,15 @@ def editar(request):
             usuario.idtipousuario = getTipoUsuario
             usuario.celular = celularUsuario
             usuario.dni = dniUsuario
-            # ✅ NO modificar id_sucursal ni idempresa - se mantienen los originales
+            # NO modificar id_sucursal ni idempresa - se mantienen los originales
             
-            # Verificar si el correo cambió
-            correo_actual_descifrado = EncryptionManager.decrypt_email(usuario.correo)
+            # Verificar si el usuario cambió
+            correo_actual_descifrado = EncryptionManager.decrypt_data(usuario.correo)
             if correo_actual_descifrado != correoUsuario:
-                # Cifrar el nuevo correo
-                correo_cifrado = EncryptionManager.encrypt_email(correoUsuario)
+                # Cifrar el nuevo nombre de usuario
+                correo_cifrado = EncryptionManager.encrypt_data(correoUsuario)
                 if not correo_cifrado:
-                    return JsonResponse({"error": "Error al cifrar el correo electrónico"}, status=400)
+                    return JsonResponse({"error": "Error al cifrar el nombre de usuario"}, status=400)
                 usuario.correo = correo_cifrado
             
             # Verificar si la contraseña cambió
@@ -245,10 +245,10 @@ def login_usuario(correo_plano, contrasena_plana):
         usuarios = Usuario.objects.filter(estado=1)
         
         for usuario in usuarios:
-            # Descifrar el correo de cada usuario
-            correo_descifrado = EncryptionManager.decrypt_email(usuario.correo)
+            # Descifrar el nombre de usuario de cada usuario
+            correo_descifrado = EncryptionManager.decrypt_data(usuario.correo)
             
-            # Si el correo coincide, verificar la contraseña
+            # Si el usuario coincide, verificar la contraseña
             if correo_descifrado == correo_plano:
                 if PasswordManager.verify_password(contrasena_plana, usuario.contrasena):
                     return usuario

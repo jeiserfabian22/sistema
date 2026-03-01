@@ -12,6 +12,7 @@ class Vehiculo(models.Model):
     placas = models.TextField(blank=True)
     serie_chasis = models.CharField(max_length=50)
     serie_motor = models.CharField(max_length=50)
+    anio = models.PositiveIntegerField(null=True, blank=True)
     estado = models.IntegerField(db_column='estado')
 
 

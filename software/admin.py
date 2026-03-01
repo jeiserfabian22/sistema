@@ -5,6 +5,8 @@ from software.models.stockModel import Stock
 from software.models.transferenciaModel import Transferencia
 from software.models.detalleTransferenciaModel import DetalleTransferencia
 from software.models.movimientoCajaModel import MovimientoCaja
+from software.models.ProformaModel import Proforma
+from software.models.ProformaDetalleModel import ProformaDetalle
 
 @admin.register(Stock)
 class StockAdmin(admin.ModelAdmin):
@@ -43,3 +45,13 @@ class MovimientoCajaAdmin(admin.ModelAdmin):
     list_display = ('id_movimiento_caja', 'tipo_movimiento', 'monto', 'id_caja', 'idusuario', 'fecha_movimiento')
     list_filter = ('tipo_movimiento', 'fecha_movimiento')
     search_fields = ('descripcion',)
+
+@admin.register(Proforma)
+class ProformaAdmin(admin.ModelAdmin):
+    list_display = ('numero_proforma', 'idcliente', 'fecha_emision', 'total', 'estado')
+    list_filter = ('estado', 'fecha_emision')
+    search_fields = ('numero_proforma', 'idcliente__razonsocial')
+
+@admin.register(ProformaDetalle)
+class ProformaDetalleAdmin(admin.ModelAdmin):
+    list_display = ('idproformadetalle', 'idproforma', 'tipo_item', 'cantidad', 'subtotal')

@@ -37,6 +37,7 @@ from .views import cajas
 from .views import historialCajas
 from .views import tipo_comprobante
 from .views import serie_comprobante
+from .views import proforma
 
 
 
@@ -271,5 +272,11 @@ urlpatterns = [
     path('agregar-serie-comprobante/', serie_comprobante.agregar_serie_comprobante, name='agregar_serie_comprobante'),
     path('editar-serie-comprobante/', serie_comprobante.editar_serie_comprobante, name='editar_serie_comprobante'),
     path('eliminar-serie-comprobante/<int:id>/', serie_comprobante.eliminar_serie_comprobante, name='eliminar_serie_comprobante'),
+
+    # Proformas 
+    path('proformas/', proforma.proformas, name='proformas'),
+    path('proformas/nueva/', proforma.nueva_proforma, name='nueva_proforma'),
+    path('proformas/pdf/<int:idproforma>/', proforma.proforma_pdf, name='proforma_pdf'),
+    path('proformas/anular/<int:idproforma>/', proforma.eliminar_proforma, name='anular_proforma'),
 
 ]

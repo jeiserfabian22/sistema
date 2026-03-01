@@ -52,7 +52,13 @@ def modulos_sidebar(request):
         
         # Ordenar hijos por orden
         for nombre, grupo in modulos_organizados.items():
-            grupo['hijos'].sort(key=lambda x: x.orden)
+            grupo['hijos'].sort(key=lambda x: x.orden if x.orden is not None else 0)
+
+        # Ordenar el diccionario principal por el orden del padre
+        modulos_organizados = dict(sorted(
+            modulos_organizados.items(),
+            key=lambda item: item[1]['padre'].orden if item[1]['padre'].orden is not None else 0
+        ))
         
         return {'modulos_organizados': modulos_organizados}
     

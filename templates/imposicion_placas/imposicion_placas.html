@@ -198,7 +198,9 @@
     </div>
   </section>
 
-  <!-- Modal Nueva Imposición -->
+  <!-- ========================================
+       ⭐ MODAL NUEVA IMPOSICIÓN CON AUTOCOMPLETE
+       ======================================== -->
   <div class="modal fade" id="modalNuevaImposicion" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
@@ -219,19 +221,30 @@
               </div>
               <div class="card-body">
                 <div class="row g-3">
+                  <!-- ⭐ VENTA CON AUTOCOMPLETE -->
                   <div class="col-md-6">
-                    <label class="form-label fw-semibold">Venta <span class="text-danger">*</span></label>
-                    <select name="idventa" id="select_venta" class="form-select" required>
-                      <option value="">Seleccione una venta</option>
-                      {% for detalle in ventas_con_vehiculos %}
-                      <option value="{{ detalle.idventa.idventa }}" 
-                              data-cliente="{{ detalle.idventa.idcliente.razonsocial }}"
-                              data-comprobante="{{ detalle.idventa.numero_comprobante }}">
-                        {{ detalle.idventa.numero_comprobante }} - {{ detalle.idventa.idcliente.razonsocial|truncatechars:30 }}
-                      </option>
-                      {% endfor %}
-                    </select>
+                    <label class="form-label fw-semibold">
+                      Venta <span class="text-danger">*</span>
+                      <i class="fa-solid fa-circle-info text-info ms-1" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Busque la venta por comprobante o cliente. Use el botón ↓ para ver todas."></i>
+                    </label>
+                    <div class="autocomplete-wrapper">
+                      <input type="text" 
+                             id="venta_search" 
+                             class="form-control autocomplete-input autocomplete-with-arrow" 
+                             placeholder="Buscar venta por comprobante o cliente..." 
+                             autocomplete="off"
+                             required>
+                      <button type="button" class="autocomplete-arrow" onclick="toggleAutocompleteVenta()">
+                        <i class="bi bi-chevron-down"></i>
+                      </button>
+                      <input type="hidden" name="idventa" id="venta_id">
+                      <div class="autocomplete-results" id="venta_results"></div>
+                    </div>
                   </div>
+                  
                   <div class="col-md-6">
                     <label class="form-label fw-semibold">Vehículo <span class="text-danger">*</span></label>
                     <select name="id_vehiculo" id="select_vehiculo" class="form-select" required disabled>
@@ -460,21 +473,35 @@
 
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-// ✅ SOLUCIÓN: Usar IIFE para evitar redeclaración de variables
+// ========================================
+// ⭐ DATOS PARA AUTOCOMPLETE DE VENTAS
+// ========================================
+const ventasData = [];
 const vehiculosPorVenta = {};
 
 {% for detalle in ventas_con_vehiculos %}
   {% if detalle.id_vehiculo %}
     (function() {
-      var idventaTemp = {{ detalle.idventa.idventa }};
+      var idventa = {{ detalle.idventa.idventa }};
+      var comprobante = "{{ detalle.idventa.numero_comprobante|escapejs }}";
+      var cliente = "{{ detalle.idventa.idcliente.razonsocial|escapejs }}";
       
-      if (!vehiculosPorVenta[idventaTemp]) {
-        vehiculosPorVenta[idventaTemp] = [];
+      // ⭐ AGREGAR A LISTA DE VENTAS (solo una vez por venta)
+      if (!vehiculosPorVenta[idventa]) {
+        ventasData.push({
+          id: idventa,
+          comprobante: comprobante,
+          cliente: cliente,
+          text: comprobante + " - " + cliente
+        });
+        vehiculosPorVenta[idventa] = [];
       }
       
-      vehiculosPorVenta[idventaTemp].push({
+      // ⭐ AGREGAR VEHÍCULO A LA VENTA
+      vehiculosPorVenta[idventa].push({
         id: {{ detalle.id_vehiculo.id_vehiculo }},
         producto: "{{ detalle.id_vehiculo.idproducto.nomproducto|escapejs }}",
         motor: "{{ detalle.id_vehiculo.serie_motor|escapejs }}",
@@ -484,93 +511,240 @@ const vehiculosPorVenta = {};
   {% endif %}
 {% endfor %}
 
-console.log("Vehículos cargados por venta:", vehiculosPorVenta);
+console.log("✅ Ventas cargadas:", ventasData.length);
+console.log("✅ Vehículos por venta:", vehiculosPorVenta);
+
+// ========================================
+// ⭐ FUNCIÓN AUTOCOMPLETE GENÉRICA
+// ========================================
+function setupAutocomplete(inputId, resultsId, data, hiddenId, onSelectCallback) {
+  const input = document.getElementById(inputId);
+  const results = document.getElementById(resultsId);
+  const hidden = document.getElementById(hiddenId);
+  
+  if (!input) return;
+
+  input.addEventListener('input', function() {
+    const value = this.value.toLowerCase();
+    results.innerHTML = '';
+    
+    if (value.length < 1) {
+      results.style.display = 'none';
+      hidden.value = '';
+      if (onSelectCallback) onSelectCallback(null);
+      return;
+    }
+    
+    const filtered = data.filter(item => 
+      item.text.toLowerCase().includes(value)
+    );
+    
+    if (filtered.length === 0) {
+      results.innerHTML = '<div class="autocomplete-item no-results">No se encontraron resultados</div>';
+      results.style.display = 'block';
+      return;
+    }
+    
+    filtered.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'autocomplete-item';
+      
+      // ⭐ FORMATO ESPECIAL PARA VENTAS
+      if (item.comprobante) {
+        div.innerHTML = `
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <strong>${item.comprobante}</strong>
+              <br>
+              <small class="text-muted">${item.cliente}</small>
+            </div>
+            <span class="badge bg-success">
+              ${vehiculosPorVenta[item.id]?.length || 0} vehículo(s)
+            </span>
+          </div>
+        `;
+      } else {
+        div.textContent = item.text;
+      }
+      
+      div.addEventListener('click', function() {
+        if (item.comprobante) {
+          input.value = `${item.comprobante} - ${item.cliente}`;
+        } else {
+          input.value = item.text;
+        }
+        hidden.value = item.id;
+        results.style.display = 'none';
+        
+        if (onSelectCallback) {
+          onSelectCallback(item);
+        }
+      });
+      results.appendChild(div);
+    });
+    
+    results.style.display = 'block';
+  });
+  
+  // Cerrar al hacer clic fuera
+  document.addEventListener('click', function(e) {
+    if (!input.contains(e.target) && !results.contains(e.target)) {
+      const arrow = input.parentElement.querySelector('.autocomplete-arrow');
+      if (arrow && !arrow.contains(e.target)) {
+        results.style.display = 'none';
+      }
+    }
+  });
+
+  // Limpiar al cambiar
+  input.addEventListener('focus', function() {
+    if (this.value && !hidden.value) {
+      this.value = '';
+    }
+  });
+}
+
+// ========================================
+// ⭐ FUNCIÓN PARA ABRIR/CERRAR CON LA FLECHA
+// ========================================
+function toggleAutocompleteVenta() {
+  const input = document.getElementById('venta_search');
+  const results = document.getElementById('venta_results');
+  const hidden = document.getElementById('venta_id');
+  
+  // Si ya está abierto, cerrar
+  if (results.style.display === 'block') {
+    results.style.display = 'none';
+    return;
+  }
+  
+  // Mostrar todos los elementos
+  results.innerHTML = '';
+  ventasData.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'autocomplete-item';
+    div.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <strong>${item.comprobante}</strong>
+          <br>
+          <small class="text-muted">${item.cliente}</small>
+        </div>
+        <span class="badge bg-success">
+          ${vehiculosPorVenta[item.id]?.length || 0} vehículo(s)
+        </span>
+      </div>
+    `;
+    
+    div.addEventListener('click', function(e) {
+      e.stopPropagation();
+      input.value = `${item.comprobante} - ${item.cliente}`;
+      hidden.value = item.id;
+      results.style.display = 'none';
+      
+      // ⭐ CARGAR VEHÍCULOS
+      cargarVehiculosDeVenta(item.id);
+    });
+    results.appendChild(div);
+  });
+  
+  results.style.display = 'block';
+  input.focus();
+}
+
+// ========================================
+// ⭐ FUNCIÓN CARGAR VEHÍCULOS DE VENTA
+// ========================================
+function cargarVehiculosDeVenta(idventa) {
+  const $selectVehiculo = $('#select_vehiculo');
+  
+  console.log("📋 Venta seleccionada:", idventa);
+  
+  $selectVehiculo.empty().append('<option value="">Seleccione un vehículo</option>');
+  $('#info_vehiculo').addClass('d-none');
+  
+  if (idventa && vehiculosPorVenta[idventa]) {
+    const vehiculos = vehiculosPorVenta[idventa];
+    console.log("🚙 Vehículos encontrados:", vehiculos.length);
+    
+    if (vehiculos.length > 0) {
+      vehiculos.forEach(function(v) {
+        $selectVehiculo.append(
+          $('<option></option>')
+            .attr('value', v.id)
+            .attr('data-producto', v.producto)
+            .attr('data-motor', v.motor)
+            .attr('data-chasis', v.chasis)
+            .text(v.producto + ' - Motor: ' + v.motor.substring(0, 15))
+        );
+      });
+      
+      $selectVehiculo.prop('disabled', false);
+      console.log("✅ Vehículos cargados correctamente");
+    } else {
+      $selectVehiculo.append('<option value="">Sin vehículos disponibles</option>');
+      $selectVehiculo.prop('disabled', true);
+      console.warn("⚠️ Array vacío para esta venta");
+    }
+  } else {
+    $selectVehiculo.prop('disabled', true);
+    console.warn("⚠️ No hay vehículos para idventa:", idventa);
+  }
+}
 
 $(document).ready(function() {
   
   // ========================================
-  // EVENTO: CAMBIO DE VENTA
+  // ⭐ INICIALIZAR AUTOCOMPLETE PARA VENTAS
   // ========================================
-  $('#select_venta').on('change', function() {
-    var idventa = parseInt($(this).val());
-    var $selectVehiculo = $('#select_vehiculo');
-    
-    console.log("📋 Venta seleccionada:", idventa);
-    
-    $selectVehiculo.empty().append('<option value="">Seleccione un vehículo</option>');
-    $('#info_vehiculo').addClass('d-none');
-    
-    if (idventa && vehiculosPorVenta[idventa]) {
-      var vehiculos = vehiculosPorVenta[idventa];
-      console.log("🚙 Vehículos encontrados:", vehiculos.length);
-      
-      if (vehiculos.length > 0) {
-        vehiculos.forEach(function(v) {
-          $selectVehiculo.append(
-            $('<option></option>')
-              .attr('value', v.id)
-              .attr('data-producto', v.producto)
-              .attr('data-motor', v.motor)
-              .attr('data-chasis', v.chasis)
-              .text(v.producto + ' - Motor: ' + v.motor.substring(0, 15))
-          );
-        });
-        
-        $selectVehiculo.prop('disabled', false);
-        console.log("✅ Vehículos cargados correctamente");
-      } else {
-        $selectVehiculo.append('<option value="">Sin vehículos disponibles</option>');
-        $selectVehiculo.prop('disabled', true);
-        console.warn("⚠️ Array vacío para esta venta");
-      }
-    } else {
-      $selectVehiculo.prop('disabled', true);
-      console.warn("⚠️ No hay vehículos para idventa:", idventa);
+  setupAutocomplete('venta_search', 'venta_results', ventasData, 'venta_id', function(item) {
+    if (item) {
+      cargarVehiculosDeVenta(item.id);
     }
   });
 
   // ========================================
-  // EVENTO: CAMBIO DE VEHÍCULO
+  // ⭐ EVENTO: CAMBIO DE VEHÍCULO
   // ========================================
   $('#select_vehiculo').on('change', function() {
-    var $selected = $(this).find(':selected');
-    var valor = $selected.val();
+    const $selected = $(this).find(':selected');
+    const valor = $selected.val();
     
     if (valor) {
-      var producto = $selected.data('producto');
-      var motor = $selected.data('motor');
-      var chasis = $selected.data('chasis');
+      const producto = $selected.data('producto');
+      const motor = $selected.data('motor');
+      const chasis = $selected.data('chasis');
       
       $('#info_producto').text(producto);
       $('#info_motor').text(motor);
       $('#info_chasis').text(chasis);
       $('#info_vehiculo').removeClass('d-none');
       
-      console.log("✅ Vehículo seleccionado:", { producto: producto, motor: motor, chasis: chasis });
+      console.log("✅ Vehículo seleccionado:", { producto, motor, chasis });
     } else {
       $('#info_vehiculo').addClass('d-none');
     }
   });
 
   // ========================================
-  // CÁLCULO AUTOMÁTICO DE TOTAL COSTOS
+  // ⭐ CÁLCULO AUTOMÁTICO DE TOTAL COSTOS
   // ========================================
   $('.costo-input').on('input', function() {
-    var total = 0;
+    let total = 0;
     $('.costo-input').each(function() {
-      var valor = parseFloat($(this).val()) || 0;
+      const valor = parseFloat($(this).val()) || 0;
       total += valor;
     });
     $('#total_costo').val(total.toFixed(2));
   });
 
   // ========================================
-  // SUBMIT: NUEVA IMPOSICIÓN
+  // ⭐ SUBMIT: NUEVA IMPOSICIÓN
   // ========================================
   $('#formNuevaImposicion').on('submit', function(e) {
     e.preventDefault();
     
-    var vehiculoSeleccionado = $('#select_vehiculo').val();
+    const vehiculoSeleccionado = $('#select_vehiculo').val();
     if (!vehiculoSeleccionado) {
       Swal.fire({
         icon: 'warning',
@@ -581,7 +755,7 @@ $(document).ready(function() {
       return;
     }
     
-    var ventaSeleccionada = $('#select_venta').val();
+    const ventaSeleccionada = $('#venta_id').val();
     if (!ventaSeleccionada) {
       Swal.fire({
         icon: 'warning',
@@ -597,7 +771,7 @@ $(document).ready(function() {
       text: 'Registrando imposición de placa',
       allowOutsideClick: false,
       showConfirmButton: false,
-      willOpen: function() { Swal.showLoading(); }
+      willOpen: () => Swal.showLoading()
     });
 
     $.ajax({
@@ -613,9 +787,7 @@ $(document).ready(function() {
             title: '¡Registrado!',
             text: res.message,
             confirmButtonColor: '#198754'
-          }).then(function() {
-            location.reload();
-          });
+          }).then(() => location.reload());
         } else {
           Swal.fire({
             icon: 'error',
@@ -626,7 +798,7 @@ $(document).ready(function() {
         }
       },
       error: function(xhr) {
-        var res = xhr.responseJSON || {};
+        const res = xhr.responseJSON || {};
         Swal.fire({
           icon: 'error',
           title: 'Error',
@@ -636,26 +808,34 @@ $(document).ready(function() {
       }
     });
   });
+  
+  // ========================================
+  // ⭐ INICIALIZAR TOOLTIPS
+  // ========================================
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+  });
 });
 
 // ========================================
-// FUNCIÓN: VER DETALLE
+// ⭐ FUNCIONES EXISTENTES (Ver Detalle, Editar, etc.)
 // ========================================
 function verDetalle(id) {
   Swal.fire({
     title: 'Cargando...',
     allowOutsideClick: false,
     showConfirmButton: false,
-    willOpen: function() { Swal.showLoading(); }
+    willOpen: () => Swal.showLoading()
   });
   
   $.get('/imposicion-placas/detalle/' + id + '/', function(res) {
     Swal.close();
     
     if (res.ok) {
-      var d = res.data;
+      const d = res.data;
       
-      var estadoBadge = '';
+      let estadoBadge = '';
       if (d.estado_tramite === 'completado') {
         estadoBadge = '<span class="badge bg-success">COMPLETADO</span>';
       } else if (d.estado_tramite === 'en_tramite') {
@@ -666,8 +846,8 @@ function verDetalle(id) {
         estadoBadge = '<span class="badge bg-warning text-dark">PENDIENTE</span>';
       }
       
-      var historialHtml = '';
-      d.historial.forEach(function(h) {
+      let historialHtml = '';
+      d.historial.forEach(h => {
         historialHtml += '<tr>' +
           '<td><small>' + h.fecha + '</small></td>' +
           '<td><small>' + h.usuario + '</small></td>' +
@@ -676,7 +856,7 @@ function verDetalle(id) {
           '</tr>';
       });
       
-      var html = '<div class="row">' +
+      const html = '<div class="row">' +
         '<div class="col-md-6">' +
           '<h6 class="fw-bold text-primary"><i class="fa-solid fa-user me-2"></i>Cliente</h6>' +
           '<p>' + d.cliente + '</p>' +
@@ -730,7 +910,7 @@ function verDetalle(id) {
         confirmButtonColor: '#dc3545'
       });
     }
-  }).fail(function() {
+  }).fail(() => {
     Swal.close();
     Swal.fire({
       icon: 'error',
@@ -741,24 +921,21 @@ function verDetalle(id) {
   });
 }
 
-// ========================================
-// FUNCIÓN: EDITAR IMPOSICIÓN
-// ========================================
 function editarImposicion(id) {
   Swal.fire({
     title: 'Cargando...',
     allowOutsideClick: false,
     showConfirmButton: false,
-    willOpen: function() { Swal.showLoading(); }
+    willOpen: () => Swal.showLoading()
   });
   
   $.get('/imposicion-placas/detalle/' + id + '/', function(res) {
     Swal.close();
     
     if (res.ok) {
-      var d = res.data;
+      const d = res.data;
       
-      var html = '<form id="formEditarImposicion" action="/imposicion-placas/editar/' + id + '/" method="post">' +
+      const html = '<form id="formEditarImposicion" action="/imposicion-placas/editar/' + id + '/" method="post">' +
         '{% csrf_token %}' +
         '<div class="alert alert-info">' +
           '<strong><i class="fa-solid fa-user me-2"></i>Cliente:</strong> ' + d.cliente + '<br>' +
@@ -863,7 +1040,7 @@ function editarImposicion(id) {
           title: 'Guardando...',
           allowOutsideClick: false,
           showConfirmButton: false,
-          willOpen: function() { Swal.showLoading(); }
+          willOpen: () => Swal.showLoading()
         });
         
         $.ajax({
@@ -879,7 +1056,7 @@ function editarImposicion(id) {
                 title: '¡Actualizado!',
                 text: res.message,
                 confirmButtonColor: '#198754'
-              }).then(function() { location.reload(); });
+              }).then(() => location.reload());
             } else {
               Swal.fire({
                 icon: 'error',
@@ -909,7 +1086,7 @@ function editarImposicion(id) {
         confirmButtonColor: '#dc3545'
       });
     }
-  }).fail(function() {
+  }).fail(() => {
     Swal.close();
     Swal.fire({
       icon: 'error',
@@ -920,13 +1097,10 @@ function editarImposicion(id) {
   });
 }
 
-// ========================================
-// FUNCIÓN: CAMBIAR ESTADO
-// ========================================
 function cambiarEstado(id, estadoActual) {
   $('#id_imposicion_estado').val(id);
   
-  var nuevoEstado = 'en_tramite';
+  let nuevoEstado = 'en_tramite';
   if (estadoActual === 'pendiente') {
     nuevoEstado = 'en_tramite';
   } else if (estadoActual === 'en_tramite') {
@@ -938,9 +1112,9 @@ function cambiarEstado(id, estadoActual) {
 }
 
 function confirmarCambioEstado() {
-  var id = $('#id_imposicion_estado').val();
-  var nuevoEstado = $('#nuevo_estado').val();
-  var comentario = $('#modalCambiarEstado').find('textarea[name="comentario"]').val();
+  const id = $('#id_imposicion_estado').val();
+  const nuevoEstado = $('#nuevo_estado').val();
+  const comentario = $('#modalCambiarEstado').find('textarea[name="comentario"]').val();
   
   if (!comentario.trim()) {
     Swal.fire({
@@ -956,7 +1130,7 @@ function confirmarCambioEstado() {
     title: 'Procesando...',
     allowOutsideClick: false,
     showConfirmButton: false,
-    willOpen: function() { Swal.showLoading(); }
+    willOpen: () => Swal.showLoading()
   });
   
   $.post('/imposicion-placas/cambiar-estado/' + id + '/', {
@@ -970,7 +1144,7 @@ function confirmarCambioEstado() {
         title: '¡Estado actualizado!',
         text: res.message,
         confirmButtonColor: '#198754'
-      }).then(function() { location.reload(); });
+      }).then(() => location.reload());
     } else {
       Swal.fire({
         icon: 'error',
@@ -979,7 +1153,7 @@ function confirmarCambioEstado() {
         confirmButtonColor: '#dc3545'
       });
     }
-  }).fail(function(xhr) {
+  }).fail(xhr => {
     Swal.fire({
       icon: 'error',
       title: 'Error',
@@ -989,9 +1163,6 @@ function confirmarCambioEstado() {
   });
 }
 
-// ========================================
-// FUNCIÓN: ELIMINAR IMPOSICIÓN
-// ========================================
 function eliminarImposicion(id) {
   Swal.fire({
     title: '¿Eliminar imposición?',
@@ -1002,7 +1173,7 @@ function eliminarImposicion(id) {
     cancelButtonColor: '#6c757d',
     confirmButtonText: '<i class="fa-solid fa-trash me-2"></i>Sí, eliminar',
     cancelButtonText: 'Cancelar'
-  }).then(function(result) {
+  }).then(result => {
     if (result.isConfirmed) {
       window.location.href = '/imposicion-placas/eliminar/' + id + '/';
     }
@@ -1011,6 +1182,125 @@ function eliminarImposicion(id) {
 </script>
 
 <style>
+  /* ========================================
+     ⭐ ESTILOS DEL SISTEMA DE AUTOCOMPLETE
+     ======================================== */
+  .autocomplete-wrapper {
+    position: relative;
+  }
+
+  .autocomplete-input {
+    width: 100%;
+  }
+
+  .autocomplete-with-arrow {
+    padding-right: 40px;
+  }
+
+  .autocomplete-arrow {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 5px 8px;
+    color: #6c757d;
+    transition: all 0.2s ease;
+    z-index: 10;
+  }
+
+  .autocomplete-arrow:hover {
+    color: #495057;
+  }
+
+  .autocomplete-arrow i {
+    font-size: 14px;
+  }
+
+  .autocomplete-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #ced4da;
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+    display: none;
+  }
+
+  .autocomplete-item {
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: all 0.2s ease;
+  }
+
+  .autocomplete-item:last-child {
+    border-bottom: none;
+  }
+
+  .autocomplete-item:hover {
+    background-color: #e9f5ff;
+  }
+
+  .autocomplete-item.no-results {
+    color: #6c757d;
+    cursor: default;
+    font-style: italic;
+  }
+
+  .autocomplete-item.no-results:hover {
+    background-color: white;
+  }
+
+  .autocomplete-item .badge {
+    font-size: 0.7rem;
+    padding: 0.25em 0.5em;
+    vertical-align: middle;
+  }
+
+  .autocomplete-item .d-flex {
+    width: 100%;
+    font-size: 0.9rem;
+  }
+
+  .autocomplete-item strong {
+    color: #495057;
+    font-weight: 600;
+  }
+
+  .autocomplete-item small {
+    color: #6c757d;
+  }
+
+  .autocomplete-results::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .autocomplete-results::-webkit-scrollbar-track {
+    background: #f8f9fa;
+    border-radius: 4px;
+  }
+
+  .autocomplete-results::-webkit-scrollbar-thumb {
+    background: #adb5bd;
+    border-radius: 4px;
+  }
+
+  .autocomplete-results::-webkit-scrollbar-thumb:hover {
+    background: #6c757d;
+  }
+
+  /* ========================================
+     ⭐ ESTILOS GENERALES
+     ======================================== */
   .card-icon {
     width: 48px;
     height: 48px;
@@ -1045,6 +1335,36 @@ function eliminarImposicion(id) {
     position: sticky;
     top: 0;
     z-index: 10;
+  }
+
+  .card-header {
+    border-radius: 10px 10px 0 0 !important;
+  }
+
+  .form-label.fw-semibold {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+  }
+
+  .form-label .text-danger {
+    font-weight: 700;
+  }
+
+  /* Animación de carga */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal.show .modal-dialog {
+    animation: fadeIn 0.3s ease;
   }
 </style>
 {% endblock %}

@@ -28,17 +28,17 @@ def login(request):
         
         usuario_encontrado = None
         
-        # Buscar el usuario descifrando cada correo
+        # Buscar y validar el usuario
         for usuario in usuarios_todos:
             try:
-                correo_descifrado = EncryptionManager.decrypt_email(usuario.correo)
-                if correo_descifrado == email:
+                usuario_identificador = EncryptionManager.decrypt_data(usuario.correo)
+                if usuario_identificador == email:
                     # Verificar contraseña hasheada
                     if PasswordManager.verify_password(contrasena2, usuario.contrasena):
                         usuario_encontrado = usuario
                         break
             except Exception as e:
-                print(f"Error al descifrar correo del usuario {usuario.idusuario}: {e}")
+                print(f"Error al descifrar identificador del usuario {usuario.idusuario}: {e}")
                 continue
 
         if usuario_encontrado:
@@ -85,7 +85,7 @@ def login(request):
             # Redirigir al dashboard o página principal
             return redirect('cpanel')  # Cambia esto por tu vista
         else:
-            error = "Correo o contraseña incorrecta"
+            error = "Usuario o contraseña incorrecta"
             data = {"error": error}
             return render(request, 'index.html', data)
     else:

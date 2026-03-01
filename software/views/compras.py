@@ -115,6 +115,7 @@ def compras(request):
     }
     
     return render(request, 'compras/compras.html', data)
+
 # Nueva compra
 @requiere_caja_aperturada
 def nueva_compra(request):
@@ -227,6 +228,7 @@ def nueva_compra(request):
                             idproducto_id=int(idproducto),
                             serie_motor=request.POST.get(f"serie_motor_{i}", "").strip(),
                             serie_chasis=request.POST.get(f"serie_chasis_{i}", "").strip(),
+                            anio=request.POST.get(f"anio_{i}", "").strip(),
                             idestadoproducto_id=int(idestadoproducto),
                             imperfecciones=request.POST.get(f"imperfecciones_{i}", "").strip(),
                             placas=request.POST.get(f"placas_{i}", "").strip(),
@@ -278,7 +280,7 @@ def nueva_compra(request):
                         monto_adelanto_cuota = float(request.POST.get(f"monto_adelanto_{i}", 0) or 0)
                         numero_cuota = int(request.POST.get(f"numero_cuota_{i}"))
                         
-                        # ✅ USAR LA FECHA QUE VIENE DEL FORMULARIO (ya configurada en el modal)
+                        # USAR LA FECHA QUE VIENE DEL FORMULARIO (ya configurada en el modal)
                         fecha_vencimiento_str = request.POST.get(f"fecha_vencimiento_{i}")
                         
                         # Convertir string a date
@@ -476,6 +478,8 @@ def actualizar_compra(request, id):
                     serie_chasis = request.POST.get(f"serie_chasis_{i}", "").strip()
                     placas = request.POST.get(f"placas_{i}", "").strip()
                     imperfecciones = request.POST.get(f"imperfecciones_{i}", "").strip()
+                    anio_str = request.POST.get(f"anio_{i}", "").strip()
+                    anio = int(anio_str) if anio_str else None
                     
                     if not idproducto:
                         raise ValueError(f"Debe seleccionar un producto para el ítem {i}")
@@ -493,6 +497,7 @@ def actualizar_compra(request, id):
                                 'idestadoproducto_id': int(idestadoproducto),
                                 'imperfecciones': imperfecciones,
                                 'placas': placas,
+                                'anio': anio,
                                 'estado': 1
                             }
                         )
@@ -501,12 +506,14 @@ def actualizar_compra(request, id):
                             vehiculo.idestadoproducto_id = int(idestadoproducto)
                             vehiculo.imperfecciones = imperfecciones
                             vehiculo.placas = placas
+                            vehiculo.anio = anio
                             vehiculo.save()
                     else:
                         vehiculo = Vehiculo.objects.create(
                             idproducto_id=int(idproducto),
                             serie_motor=serie_motor,
                             serie_chasis=serie_chasis,
+                            anio=anio,
                             idestadoproducto_id=int(idestadoproducto),
                             imperfecciones=imperfecciones,
                             placas=placas,

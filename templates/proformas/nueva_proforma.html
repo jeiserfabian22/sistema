@@ -1,0 +1,536 @@
+{% extends 'plantilla/base.html' %}
+{% block main %}
+<main id="main" class="main">
+
+    <!-- Encabezado -->
+    <div class="pagetitle d-flex justify-content-between align-items-center">
+        <h1 class="fw-bold text-primary">
+            <i class="fa-solid fa-file-invoice-dollar me-2"></i>Nueva Proforma
+        </h1>
+        <a href="{% url 'proformas' %}" class="btn btn-outline-secondary rounded-pill">
+            <i class="fa-solid fa-arrow-left me-2"></i>Volver
+        </a>
+    </div>
+
+    <nav aria-label="breadcrumb" class="mt-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'cpanel' %}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'proformas' %}">Proformas</a></li>
+            <li class="breadcrumb-item active">Nueva Proforma</li>
+        </ol>
+    </nav>
+
+    <section class="section mt-4">
+        <form id="formNuevaProforma" action="{% url 'nueva_proforma' %}" method="post">
+            {% csrf_token %}
+
+            <!-- ═══ DATOS DEL CLIENTE ═══ -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-primary text-white d-flex align-items-center">
+                    <i class="fa-solid fa-user me-2"></i>
+                    <h6 class="mb-0 fw-bold">Datos del Cliente</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+
+                        <!-- Buscar Cliente -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Cliente <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <div class="autocomplete-wrapper flex-grow-1">
+                                    <input type="text" id="cliente_search_pf"
+                                        class="form-control autocomplete-input autocomplete-with-arrow"
+                                        placeholder="Buscar cliente por nombre o documento..." autocomplete="off"
+                                        required>
+                                    <button type="button" class="autocomplete-arrow" onclick="toggleAutocompletePf()">
+                                        <i class="bi bi-chevron-down"></i>
+                                    </button>
+                                    <input type="hidden" name="cliente" id="cliente_id_pf">
+                                    <div class="autocomplete-results" id="cliente_results_pf"></div>
+                                </div>
+                                <button type="button" class="btn btn-success" data-bs-toggle="modal"
+                                    data-bs-target="#modalAgregarClientePf" title="Agregar nuevo cliente">
+                                    <i class="fa-solid fa-user-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Fecha de vencimiento de la proforma -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Válida hasta</label>
+                            <input type="date" name="fecha_vencimiento" class="form-control"
+                                value="{{ vencimiento_default }}">
+                        </div>
+
+                        <!-- N° Proforma (auto) -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">N° Proforma</label>
+                            <input type="text" class="form-control fw-bold text-primary"
+                                value="(Se genera automáticamente)" readonly
+                                style="background:#e3f2fd; border:2px solid #2196f3;">
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ DETALLE DE PRODUCTOS ═══ -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fa-solid fa-list me-2"></i>
+                        <h6 class="mb-0 fw-bold d-inline">Detalle de la Proforma</h6>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-success" onclick="agregarItemPf('vehiculo')">
+                            <i class="fa-solid fa-motorcycle me-1"></i>Agregar Vehículo
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="agregarItemPf('repuesto')">
+                            <i class="fa-solid fa-wrench me-1"></i>Agregar Repuesto
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover table-sm mb-0" id="tablaDetallePf">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th style="width:8%">Tipo</th>
+                                    <th style="width:22%">Producto/Repuesto</th>
+                                    <th style="width:22%">Detalle</th>
+                                    <th style="width:7%">Cant.</th>
+                                    <th style="width:13%">Precio Normal</th>
+                                    <th style="width:13%" class="bg-warning bg-opacity-25">
+                                        <i class="fa-solid fa-tag me-1"></i>P. Descuento
+                                        <br><small class="text-muted">(Opcional)</small>
+                                    </th>
+                                    <th style="width:11%">Subtotal</th>
+                                    <th style="width:4%">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyItemsPf">
+                                <!-- Filas dinámicas -->
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="5" class="text-end fw-bold fs-5">SUBTOTAL:</td>
+                                    <td class="text-end fw-bold text-primary fs-5" id="subtotalPf">S/ 0.00</td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <input type="hidden" name="items_count" id="items_count_pf" value="0">
+                </div>
+            </div>
+
+            <!-- ═══ CONDICIONES COMERCIALES ═══ -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <i class="fa-solid fa-handshake me-2"></i>
+                    <h6 class="mb-0 fw-bold d-inline">Condiciones Comerciales</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Forma de Pago</label>
+                            <input type="text" name="forma_pago" class="form-control" value="Contado"
+                                placeholder="Ej: Contado, 50% adelanto...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Tiempo de Entrega</label>
+                            <input type="text" name="tiempo_entrega" class="form-control" value="Inmediata"
+                                placeholder="Ej: 3-5 días hábiles...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Garantía</label>
+                            <input type="text" name="garantia" class="form-control" value="Según fabricante"
+                                placeholder="Ej: 1 año de garantía...">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">Observaciones</label>
+                            <textarea name="observaciones" class="form-control" rows="2"
+                                placeholder="Condiciones adicionales u observaciones (opcional)..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de acción -->
+            <div class="d-flex justify-content-end gap-2 mb-4">
+                <a href="{% url 'proformas' %}" class="btn btn-outline-secondary rounded-pill px-4">
+                    Cancelar
+                </a>
+                <button type="button" class="btn btn-success rounded-pill px-4" id="btnGuardarProforma">
+                    <i class="fa-solid fa-save me-2"></i>Guardar Proforma
+                </button>
+            </div>
+        </form>
+    </section>
+
+</main>
+
+<!-- ═══ MODAL AGREGAR CLIENTE ═══ -->
+<div class="modal fade" id="modalAgregarClientePf" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content rounded-3 shadow-lg">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fa-solid fa-user-plus me-2"></i>Agregar Nuevo Cliente</h5>
+                <button type="button" class="btn-close btn-close-white" onclick="cerrarModalClientePf()"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fa-solid fa-circle-info me-2"></i>
+                    Ingrese el DNI (8 dígitos) o RUC (11 dígitos) y los datos se autocompletarán.
+                </div>
+                <form id="formAgregarClientePf">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Tipo de Entidad <span
+                                    class="text-danger">*</span></label>
+                            <select name="tipoEntidadCliente" id="tipoEntidadPf" class="form-select" required>
+                                <option value="">Seleccione...</option>
+                                {% for tipo in tipos_entidad %}
+                                <option value="{{ tipo.id_tipo_entidad }}">{{ tipo.tipo_entidad }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Número de Documento <span
+                                    class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="text" name="numdocCliente" id="numdocPf" class="form-control"
+                                    maxlength="11" placeholder="DNI (8) o RUC (11)" required>
+                                <button class="btn btn-primary" type="button" id="btnConsultarDocPf">
+                                    <i class="fa-solid fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Razón Social / Nombre <span
+                                class="text-danger">*</span></label>
+                        <input type="text" name="razonsocialCliente" id="razonsocialPf" class="form-control" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Teléfono</label>
+                            <input type="text" name="telefonoCliente" id="telefonoPf" class="form-control"
+                                maxlength="15">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Dirección</label>
+                            <input type="text" name="direccionCliente" id="direccionPf" class="form-control">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-success" id="btnGuardarClientePf">
+                            <i class="fa-solid fa-save me-2"></i>Guardar Cliente
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary"
+                            onclick="cerrarModalClientePf()">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    // ═══════════════════════════════════════════════════════
+    // DATOS DEL CATÁLOGO
+    // ═══════════════════════════════════════════════════════
+    const clientesDataPf = [
+        {% for c in clientes %}
+    { id: { { c.idcliente } }, text: "{{ c.razonsocial|escapejs }} - {{ c.numdoc|escapejs }}" },
+    {% endfor %}
+];
+
+    const productosStockPf = JSON.parse('{{ productos_stock|escapejs }}');
+    const repuestosStockPf = JSON.parse('{{ repuestos_stock|escapejs }}');
+
+    let itemCounterPf = 0;
+
+    // ═══════════════════════════════════════════════════════
+    // AUTOCOMPLETE CLIENTE
+    // ═══════════════════════════════════════════════════════
+    const inputCliente = document.getElementById('cliente_search_pf');
+    const resultadosCliente = document.getElementById('cliente_results_pf');
+    const hiddenCliente = document.getElementById('cliente_id_pf');
+
+    inputCliente.addEventListener('input', function () {
+        const q = this.value.toLowerCase();
+        resultadosCliente.innerHTML = '';
+        if (q.length < 1) { resultadosCliente.style.display = 'none'; hiddenCliente.value = ''; return; }
+        const filtrados = clientesDataPf.filter(c => c.text.toLowerCase().includes(q));
+        if (!filtrados.length) {
+            resultadosCliente.innerHTML = '<div class="autocomplete-item no-results">Sin resultados</div>';
+        } else {
+            filtrados.forEach(c => {
+                const d = document.createElement('div');
+                d.className = 'autocomplete-item';
+                d.textContent = c.text;
+                d.addEventListener('click', () => {
+                    inputCliente.value = c.text; hiddenCliente.value = c.id;
+                    resultadosCliente.style.display = 'none';
+                });
+                resultadosCliente.appendChild(d);
+            });
+        }
+        resultadosCliente.style.display = 'block';
+    });
+
+    document.addEventListener('click', e => {
+        if (!inputCliente.contains(e.target) && !resultadosCliente.contains(e.target))
+            resultadosCliente.style.display = 'none';
+    });
+
+    function toggleAutocompletePf() {
+        if (resultadosCliente.style.display === 'block') { resultadosCliente.style.display = 'none'; return; }
+        resultadosCliente.innerHTML = '';
+        clientesDataPf.forEach(c => {
+            const d = document.createElement('div');
+            d.className = 'autocomplete-item';
+            d.textContent = c.text;
+            d.addEventListener('click', e => {
+                e.stopPropagation();
+                inputCliente.value = c.text; hiddenCliente.value = c.id;
+                resultadosCliente.style.display = 'none';
+            });
+            resultadosCliente.appendChild(d);
+        });
+        resultadosCliente.style.display = 'block';
+        inputCliente.focus();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // AGREGAR ÍTEM (Vehículo o Repuesto)
+    // ═══════════════════════════════════════════════════════
+    function agregarItemPf(tipo) {
+        itemCounterPf++;
+        const i = itemCounterPf;
+        const tbody = document.getElementById('tbodyItemsPf');
+        const tr = document.createElement('tr');
+        tr.id = `fila_pf_${i}`;
+
+        // Badge Tipo
+        const badgeTipo = tipo === 'vehiculo'
+            ? '<span class="badge bg-success">Vehículo</span>'
+            : '<span class="badge bg-primary">Repuesto</span>';
+
+        // Opciones del selector de Producto/Repuesto
+        const catalogoActual = tipo === 'vehiculo' ? productosStockPf : repuestosStockPf;
+        let opciones = '<option value="">Buscar producto...</option>';
+        for (const nombre in catalogoActual) {
+            opciones += `<option value="${nombre}">${nombre}</option>`;
+        }
+
+        tr.innerHTML = `
+    <td>
+      ${badgeTipo}
+      <input type="hidden" name="tipo_item_${i}" value="${tipo}">
+    </td>
+    <td>
+      <select class="form-select form-select-sm" id="selectProducto_${i}"
+              onchange="seleccionarProductoPf(${i}, '${tipo}')">
+        ${opciones}
+      </select>
+    </td>
+    <td>
+      <select class="form-select form-select-sm" id="selectDetalle_${i}"
+              onchange="cargarPrecioPf(${i}, '${tipo}')" disabled>
+        <option value="">Primero seleccione producto</option>
+      </select>
+      <input type="hidden" name="${tipo === 'vehiculo' ? 'id_vehiculo' : 'id_repuesto'}_${i}" id="hiddenId_${i}">
+    </td>
+    <td>
+      <input type="number" name="cantidad_${i}" id="cantidad_${i}"
+             class="form-control form-control-sm" value="1" min="1"
+             oninput="calcularSubtotalPf(${i})">
+    </td>
+    <td>
+      <input type="number" name="precio_venta_contado_${i}" id="precio_${i}"
+             class="form-control form-control-sm" value="0" step="0.01" readonly
+             style="background:#e8f5e9;">
+    </td>
+    <td>
+      <input type="number" name="precio_descuento_${i}" id="descuento_${i}"
+             class="form-control form-control-sm" step="0.01" min="0"
+             placeholder="Opcional" oninput="calcularSubtotalPf(${i})">
+    </td>
+    <td class="fw-bold text-success" id="subtotal_${i}">S/ 0.00</td>
+    <td>
+      <button type="button" class="btn btn-sm btn-danger"
+              onclick="eliminarFilaPf(${i})">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+    </td>
+  `;
+
+        tbody.appendChild(tr);
+        document.getElementById('items_count_pf').value = i;
+        actualizarTotalPf();
+    }
+
+    function seleccionarProductoPf(i, tipo) {
+        const nombreProducto = document.getElementById(`selectProducto_${i}`).value;
+        const selectDetalle = document.getElementById(`selectDetalle_${i}`);
+        const catalogo = tipo === 'vehiculo' ? productosStockPf : repuestosStockPf;
+
+        selectDetalle.innerHTML = '<option value="">Seleccione...</option>';
+        selectDetalle.disabled = true;
+        document.getElementById(`hiddenId_${i}`).value = '';
+        document.getElementById(`precio_${i}`).value = '0';
+        document.getElementById(`subtotal_${i}`).textContent = 'S/ 0.00';
+
+        if (!nombreProducto || !catalogo[nombreProducto]) return;
+
+        const items = catalogo[nombreProducto];
+        items.forEach(item => {
+            const opt = document.createElement('option');
+            if (tipo === 'vehiculo') {
+                opt.value = item.id_vehiculo;
+                opt.dataset.precio = item.precio_venta;
+                opt.textContent = `Motor: ${item.serie_motor || '-'} | Chasis: ${item.serie_chasis || '-'} | Año: ${item.anio || '-'}`;
+            } else {
+                opt.value = item.id_repuesto_comprado;
+                opt.dataset.precio = item.precio_venta;
+                opt.textContent = `Cód: ${item.codigo_barras || '-'} | Marca: ${item.marca || '-'}`;
+            }
+            selectDetalle.appendChild(opt);
+        });
+
+        selectDetalle.disabled = false;
+    }
+
+    function cargarPrecioPf(i, tipo) {
+        const selectDetalle = document.getElementById(`selectDetalle_${i}`);
+        const optSelected = selectDetalle.options[selectDetalle.selectedIndex];
+        document.getElementById(`hiddenId_${i}`).value = selectDetalle.value;
+        const precio = parseFloat(optSelected.dataset.precio || 0);
+        document.getElementById(`precio_${i}`).value = precio.toFixed(2);
+        calcularSubtotalPf(i);
+    }
+
+    function calcularSubtotalPf(i) {
+        const cantidad = parseFloat(document.getElementById(`cantidad_${i}`).value) || 0;
+        const precio = parseFloat(document.getElementById(`precio_${i}`).value) || 0;
+        const descuento = parseFloat(document.getElementById(`descuento_${i}`).value);
+        const precioFinal = (!isNaN(descuento) && descuento > 0 && descuento < precio) ? descuento : precio;
+        const subtotal = cantidad * precioFinal;
+        document.getElementById(`subtotal_${i}`).textContent = 'S/ ' + subtotal.toFixed(2);
+        actualizarTotalPf();
+    }
+
+    function actualizarTotalPf() {
+        let total = 0;
+        document.querySelectorAll('[id^="subtotal_"]').forEach(el => {
+            total += parseFloat(el.textContent.replace('S/ ', '')) || 0;
+        });
+        document.getElementById('subtotalPf').textContent = 'S/ ' + total.toFixed(2);
+    }
+
+    function eliminarFilaPf(i) {
+        const fila = document.getElementById(`fila_pf_${i}`);
+        if (fila) fila.remove();
+        actualizarTotalPf();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // GUARDAR PROFORMA
+    // ═══════════════════════════════════════════════════════
+    document.getElementById('btnGuardarProforma').addEventListener('click', function () {
+        const clienteId = document.getElementById('cliente_id_pf').value;
+        if (!clienteId) {
+            Swal.fire('Atención', 'Debe seleccionar un cliente.', 'warning'); return;
+        }
+        const items = parseInt(document.getElementById('items_count_pf').value);
+        if (items === 0) {
+            Swal.fire('Atención', 'Debe agregar al menos un ítem.', 'warning'); return;
+        }
+
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+
+        const form = document.getElementById('formNuevaProforma');
+        const formData = new FormData(form);
+
+        fetch('{% url "nueva_proforma" %}', {
+            method: 'POST',
+            body: formData
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Proforma Creada!',
+                        html: `<b>${data.numero_proforma}</b> creada correctamente.<br>¿Desea ver el PDF?`,
+                        showCancelButton: true,
+                        confirmButtonText: 'Ver PDF',
+                        cancelButtonText: 'Volver al listado'
+                    }).then(result => {
+                        if (result.isConfirmed) {
+                            window.open(`/proformas/pdf/${data.idproforma}/`, '_blank');
+                        }
+                        window.location.href = '{% url "proformas" %}';
+                    });
+                } else {
+                    Swal.fire('Error', data.error, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-save me-2"></i>Guardar Proforma';
+                }
+            })
+            .catch(err => {
+                Swal.fire('Error', 'Error de red: ' + err.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-save me-2"></i>Guardar Proforma';
+            });
+    });
+
+    // ═══════════════════════════════════════════════════════
+    // MODAL CLIENTE
+    // ═══════════════════════════════════════════════════════
+    function cerrarModalClientePf() {
+        const m = bootstrap.Modal.getInstance(document.getElementById('modalAgregarClientePf'));
+        if (m) m.hide();
+        document.getElementById('formAgregarClientePf').reset();
+    }
+
+    document.getElementById('btnConsultarDocPf').addEventListener('click', async function () {
+        const numero = document.getElementById('numdocPf').value.trim();
+        if (numero.length !== 8 && numero.length !== 11) {
+            Swal.fire('Atención', 'El documento debe tener 8 (DNI) u 11 (RUC) dígitos.', 'warning'); return;
+        }
+        const r = await fetch(`/api/autocompletar-cliente/?numero=${numero}`);
+        const data = await r.json();
+        if (data.success) {
+            document.getElementById('razonsocialPf').value = data.razonsocial || '';
+            document.getElementById('direccionPf').value = data.direccion || '';
+            if (data.id_tipo_entidad) document.getElementById('tipoEntidadPf').value = data.id_tipo_entidad;
+        } else {
+            Swal.fire('Sin datos', data.message || 'No se encontraron datos.', 'info');
+        }
+    });
+
+    document.getElementById('btnGuardarClientePf').addEventListener('click', async function () {
+        const formData = new FormData(document.getElementById('formAgregarClientePf'));
+        const r = await fetch('/clientes/agregar/', { method: 'POST', body: formData });
+        const data = await r.json();
+        if (data.success || data.ok) {
+            // Agregar al autocomplete
+            clientesDataPf.push({ id: data.idcliente, text: data.razonsocial + ' - ' + data.numdoc });
+            Swal.fire('¡Listo!', 'Cliente guardado correctamente.', 'success');
+            cerrarModalClientePf();
+        } else {
+            Swal.fire('Error', data.error || 'No se pudo guardar el cliente.', 'error');
+        }
+    });
+</script>
+{% endblock %}
